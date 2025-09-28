@@ -1,29 +1,23 @@
-// controllers/userWorkController.js
 const UserWork = require("../models/UserWork");
 
-// ➡️ Create new work entry
 exports.createWork = async (req, res) => {
   try {
-    const { name, sqft, from, malPlus, kating, date, paymentStatus, paidAmount, addUser } = req.body;
+    const { name, sqft, item, from, partyTo, malPlus, kating, date, paymentStatus, paidAmount, addUser } = req.body;
 
     if (!name) return res.status(400).json({ message: "User name is required" });
 
-    // Check if user exists
     const existingUser = await UserWork.findOne({ name });
 
-    // If user is new and frontend hasn't confirmed adding yet
     if (!existingUser && !addUser) {
       return res.status(200).json({ isNewUser: true, message: "User does not exist" });
     }
-
-    // Calculate total
     const totalAmount = (parseFloat(malPlus) || 0) + (parseFloat(kating) || 0);
-
-    // Save work entry
     const newWork = new UserWork({
       name,
       sqft,
+      item,       
       from,
+      partyTo,    
       malPlus,
       kating,
       total: totalAmount,
@@ -41,16 +35,13 @@ exports.createWork = async (req, res) => {
   }
 };
 
-// ➡️ Search users for autocomplete
-// Search users for autocomplete
 exports.searchUserByName = async (req, res) => {
   try {
     const { name } = req.query;
     if (!name) return res.json([]);
 
-    // Find matching names (case-insensitive)
     const users = await UserWork.find({ name: { $regex: name, $options: "i" } })
-      .distinct("name") // unique name;
+      .distinct("name") 
 
     res.json(users);
 
@@ -60,22 +51,18 @@ exports.searchUserByName = async (req, res) => {
   }
 };
 
-// Controller: weeklyReportByName
-
 exports.getWeeklyReportByName = async (req, res) => {
   try {
-    const { name, sunday } = req.query; // sunday = selected Sunday date
+    const { name, sunday } = req.query; 
     if (!name || !sunday) return res.status(400).json({ message: "Name and Sunday date required" });
 
     const selectedSunday = new Date(sunday);
     selectedSunday.setHours(23, 59, 59, 999);
 
-    // Monday = Sunday - 6 days
     const monday = new Date(selectedSunday);
     monday.setDate(selectedSunday.getDate() - 6);
     monday.setHours(0, 0, 0, 0);
 
-    // Fetch entries between Monday and Sunday
     const entries = await UserWork.find({
       name,
       date: { $gte: monday, $lte: selectedSunday },
@@ -89,7 +76,8 @@ exports.getWeeklyReportByName = async (req, res) => {
     const updatedEntries = entries.map((e) => {
       totalAmount += e.total || 0;
       totalPaid += e.paidAmount || 0;
-      return { ...e.toObject(), remainingAmount: totalAmount - totalPaid };
+      return { ...e.toObject(), remainingAmount: totalAmount - totalPaid ,  item: e.item,       
+    partyTo: e.partyTo  };
     });
 
     res.json({
@@ -107,4 +95,36 @@ exports.getWeeklyReportByName = async (req, res) => {
 };
 
 
+exports.getWeeklyReportAllUsers = async (req, res) => {
+  try {
+    const { monday } = req.query;
+    if (!monday) return res.status(400).json({ message: "Monday date required" });
+    const mondayDate = new Date(monday);
+    mondayDate.setHours(0, 0, 0, 0);
+
+    const saturdayDate = new Date(mondayDate);
+    saturdayDate.setDate(mondayDate.getDate() + 5); 
+    saturdayDate.setHours(23, 59, 59, 999);
+
+    const entries = await UserWork.find({
+      date: { $gte: mondayDate, $lte: saturdayDate },
+    }).sort({ date: 1 });
+
+    if (!entries.length) return res.json([]);
+
+    const updatedEntries = entries.map((e) => {
+      const obj = e.toObject();
+      return {
+        ...obj,
+        unpaidAmount: (obj.total || 0) - (obj.paidAmount || 0),
+      };
+    });
+
+    res.json(updatedEntries);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching weekly report for all users", error: err.message });
+  }
+};
 

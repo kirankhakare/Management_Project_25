@@ -1,9 +1,11 @@
 const mongoose = require("mongoose");
 
 const userWorkSchema = new mongoose.Schema({
-  name: { type: String, required: true }, // user name
+  name: { type: String, required: true }, 
   sqft: String,
+  item: String,      
   from: String,
+  partyTo: String,    
   malPlus: Number,
   kating: Number,
   total: Number,

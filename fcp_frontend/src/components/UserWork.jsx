@@ -16,16 +16,12 @@ export default function UserWorkForm() {
     paymentStatus: "Unpaid",
     paidAmount: "",
   });
-
-  // 🔹 Handle input change for all fields
   const handleChange = (e) => {
     const { name, value } = e.target;
     const updated = { ...formData, [name]: value };
     updated.total = (parseFloat(updated.malPlus) || 0) + (parseFloat(updated.kating) || 0);
     setFormData(updated);
   };
-
-  // 🔹 Autocomplete search as user types
   const handleNameChange = async (event, newValue) => {
     setFormData({ ...formData, name: newValue });
 
@@ -41,7 +37,6 @@ export default function UserWorkForm() {
     }
   };
 
-  // 🔹 Submit work
   const handleSubmit = async () => {
     try {
       const res = await axios.post("http://localhost:5000/api/userWork", { ...formData, addUser: false });
@@ -51,12 +46,10 @@ export default function UserWorkForm() {
         if (!confirmAdd) return;
 
         await axios.post("http://localhost:5000/api/userWork", { ...formData, addUser: true });
-        alert("✅ New user added and work saved!");
+        alert(" New user added and work saved!");
       } else {
-        alert("✅ Work saved successfully!");
+        alert(" Work saved successfully!");
       }
-
-      // Reset form
       setFormData({
         name: "",
         sqft: "",
@@ -72,46 +65,127 @@ export default function UserWorkForm() {
       setUserOptions([]);
     } catch (err) {
       console.error(err.response?.data || err.message);
-      alert("❌ Failed to save work");
+      alert("Failed to save work");
     }
   };
-
   return (
     <Grid container spacing={2} alignItems="center" sx={{ mb: 2 }}>
-      <Box sx={{ maxWidth: 600, mx: "auto", mt: 5 }}>
-        <Typography variant="h5" gutterBottom>Add User Work</Typography>
+  <Box sx={{ maxWidth: 600, mx: "auto", mt: 5 }}>
+    <Typography variant="h5" gutterBottom>Add User Work</Typography>
 
-        <Autocomplete
-          freeSolo
-          options={userOptions}
-          value={formData.name}
-          onInputChange={handleNameChange}
-          renderInput={(params) => (
-            <TextField {...params} label="User Name" fullWidth sx={{ mb: 2 }} />
-          )}
-        />
+    <Autocomplete
+      freeSolo
+      options={userOptions}
+      value={formData.name}
+      onInputChange={handleNameChange}
+      renderInput={(params) => (
+        <TextField {...params} label="User Name" fullWidth sx={{ mb: 2 }} />
+      )}
+    />
 
-        <TextField label="Sq. Ft." name="sqft" value={formData.sqft} onChange={handleChange} fullWidth sx={{ mb: 2 }} />
-        <TextField label="From" name="from" value={formData.from} onChange={handleChange} fullWidth sx={{ mb: 2 }} />
-        <TextField label="Mal+" name="malPlus" value={formData.malPlus} onChange={handleChange} fullWidth sx={{ mb: 2 }} />
-        <TextField label="Kating" name="kating" value={formData.kating} onChange={handleChange} fullWidth sx={{ mb: 2 }} />
-        <TextField label="Total Amount" name="total" value={formData.total} InputProps={{ readOnly: true }} fullWidth sx={{ mb: 2 }} />
-        <TextField type="date" name="date" value={formData.date} onChange={handleChange} fullWidth sx={{ mb: 2 }} InputLabelProps={{ shrink: true }} />
+    {/* Sq.Ft field */}
+    <TextField
+      label="Sq. Ft."
+      name="sqft"
+      value={formData.sqft}
+      onChange={handleChange}
+      fullWidth
+      sx={{ mb: 2 }}
+    />
 
-        <FormControl component="fieldset" sx={{ mb: 2 }}>
-          <FormLabel component="legend">Payment Status</FormLabel>
-          <RadioGroup row name="paymentStatus" value={formData.paymentStatus} onChange={handleChange}>
-            <FormControlLabel value="Paid" control={<Radio />} label="Paid" />
-            <FormControlLabel value="Unpaid" control={<Radio />} label="Unpaid" />
-          </RadioGroup>
-        </FormControl>
+    {/* New field: Item */}
+    <TextField
+      label="Item"
+      name="item"
+      value={formData.item || ""}
+      onChange={handleChange}
+      fullWidth
+      sx={{ mb: 2 }}
+    />
 
-        {formData.paymentStatus === "Paid" && (
-          <TextField label="Paid Amount" name="paidAmount" value={formData.paidAmount} onChange={handleChange} fullWidth sx={{ mb: 2 }} />
-        )}
+    {/* From field */}
+    <TextField
+      label="From"
+      name="from"
+      value={formData.from}
+      onChange={handleChange}
+      fullWidth
+      sx={{ mb: 2 }}
+    />
 
-        <Button variant="contained" color="primary" onClick={handleSubmit}>Save Work</Button>
-      </Box>
-    </Grid>
+    {/* New field: Party To */}
+    <TextField
+      label="Party To"
+      name="partyTo"
+      value={formData.partyTo || ""}
+      onChange={handleChange}
+      fullWidth
+      sx={{ mb: 2 }}
+    />
+
+    <TextField
+      label="Mal+"
+      name="malPlus"
+      value={formData.malPlus}
+      onChange={handleChange}
+      fullWidth
+      sx={{ mb: 2 }}
+    />
+    <TextField
+      label="Kating"
+      name="kating"
+      value={formData.kating}
+      onChange={handleChange}
+      fullWidth
+      sx={{ mb: 2 }}
+    />
+    <TextField
+      label="Total Amount"
+      name="total"
+      value={formData.total}
+      InputProps={{ readOnly: true }}
+      fullWidth
+      sx={{ mb: 2 }}
+    />
+    <TextField
+      type="date"
+      name="date"
+      value={formData.date}
+      onChange={handleChange}
+      fullWidth
+      sx={{ mb: 2 }}
+      InputLabelProps={{ shrink: true }}
+    />
+
+    <FormControl component="fieldset" sx={{ mb: 2 }}>
+      <FormLabel component="legend">Payment Status</FormLabel>
+      <RadioGroup
+        row
+        name="paymentStatus"
+        value={formData.paymentStatus}
+        onChange={handleChange}
+      >
+        <FormControlLabel value="Paid" control={<Radio />} label="Paid" />
+        <FormControlLabel value="Unpaid" control={<Radio />} label="Unpaid" />
+      </RadioGroup>
+    </FormControl>
+
+    {formData.paymentStatus === "Paid" && (
+      <TextField
+        label="Paid Amount"
+        name="paidAmount"
+        value={formData.paidAmount}
+        onChange={handleChange}
+        fullWidth
+        sx={{ mb: 2 }}
+      />
+    )}
+
+    <Button variant="contained" color="primary" onClick={handleSubmit}>
+      Save Work
+    </Button>
+  </Box>
+</Grid>
+
   );
 }

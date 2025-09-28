@@ -10,24 +10,23 @@ import {
   Box,
 } from "@mui/material";
 import { Link, useLocation } from "react-router-dom";
-import Header from "./Header"; // Import your Header component
+import Header from "./Header"; 
 
 const drawerWidth = 240;
 
 export default function Layout({ children }) {
   const [open, setOpen] = useState(true);
-  const location = useLocation(); // To highlight active menu
+  const location = useLocation(); 
 
   const menuItems = [
     { text: "Add User Work", path: "/user_work" },
-    { text: "Overall Sunday Reports", path: "/reports" },
+    { text: "User Wise Find Reports", path: "/reports" },
+    { text: "Days Wise Find Reports", path: "/days_data" },
   ];
 
   return (
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
-
-      {/* AppBar with scrolling header */}
       <AppBar
         position="fixed"
         sx={{
@@ -39,8 +38,6 @@ export default function Layout({ children }) {
           <Header />
         </Toolbar>
       </AppBar>
-
-      {/* Sidebar */}
       <Drawer
         variant="permanent"
         sx={{
@@ -49,8 +46,8 @@ export default function Layout({ children }) {
           [`& .MuiDrawer-paper`]: {
             width: drawerWidth,
             boxSizing: "border-box",
-            backgroundColor: "#f5f5f5", // Light background
-            color: "#333", // Dark text
+            backgroundColor: "#f5f5f5", 
+            color: "#333", 
             paddingTop: 2,
           },
         }}
@@ -70,9 +67,9 @@ export default function Layout({ children }) {
                   px: 3,
                   fontSize: "1rem",
                   backgroundColor:
-                    location.pathname === item.path ? "#e0e0e0" : "transparent", // active highlight
+                    location.pathname === item.path ? "#e0e0e0" : "transparent", 
                   "&:hover": {
-                    backgroundColor: "#d5d5d5", // hover effect
+                    backgroundColor: "#d5d5d5",
                   },
                 }}
               >
@@ -81,7 +78,7 @@ export default function Layout({ children }) {
                   primaryTypographyProps={{
                     fontSize: 16,
                     fontWeight: location.pathname === item.path ? "bold" : "normal",
-                    color: "#333", // text color
+                    color: "#333", 
                   }}
                 />
               </ListItem>
@@ -89,13 +86,11 @@ export default function Layout({ children }) {
           </List>
         </Box>
       </Drawer>
-
-      {/* Main content area */}
       <Box
         component="main"
         sx={{ flexGrow: 1, bgcolor: "background.default", p: 3 }}
       >
-        <Toolbar /> {/* Spacer for AppBar */}
+        <Toolbar /> 
         {children}
       </Box>
     </Box>

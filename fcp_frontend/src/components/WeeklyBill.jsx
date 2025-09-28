@@ -8,8 +8,6 @@ export default function WeeklyReport() {
   const [inputValue, setInputValue] = useState("");
   const [selectedSunday, setSelectedSunday] = useState("");
   const [report, setReport] = useState(null);
-
-  // Autocomplete fetch
   const fetchSuggestions = async (name) => {
     if (!name) return setUserOptions([]);
     try {
@@ -19,19 +17,15 @@ export default function WeeklyReport() {
       console.error(err);
     }
   };
-
   const handleInputChange = (event, newInputValue) => {
     setInputValue(newInputValue);
     if (newInputValue.length >= 1) fetchSuggestions(newInputValue);
   };
-
-  // Fetch weekly report
   const fetchReport = async () => {
     if (!selectedName || !selectedSunday) {
       alert("Select user and Sunday date");
       return;
     }
-
     try {
       const res = await axios.get("http://localhost:5000/api/userWork/weeklyReportByName", {
         params: { name: selectedName, sunday: selectedSunday },
@@ -42,15 +36,12 @@ export default function WeeklyReport() {
         setReport(null);
         return;
       }
-
       setReport(res.data);
     } catch (err) {
       console.error(err);
       alert("Failed to fetch report");
     }
   };
-
-  // Print report
   const handlePrint = () => {
     if (!report) return;
     const printContent = document.getElementById("billPreview").innerHTML;
@@ -72,13 +63,11 @@ export default function WeeklyReport() {
     newWin.document.close();
     newWin.print();
   };
-
   return (
     <Box sx={{ maxWidth: 900, mx: "auto", mt: 5, p: 3 }}>
       <Typography variant="h4" gutterBottom align="center">
         Weekly Report
       </Typography>
-
       <Autocomplete
         freeSolo
         options={userOptions}
@@ -88,7 +77,6 @@ export default function WeeklyReport() {
         onChange={(e, newValue) => setSelectedName(newValue)}
         renderInput={(params) => <TextField {...params} label="User Name" fullWidth sx={{ mb: 2 }} />}
       />
-
       <TextField
         label="Select Sunday of the week"
         type="date"
@@ -98,7 +86,6 @@ export default function WeeklyReport() {
         sx={{ mb: 2 }}
         InputLabelProps={{ shrink: true }}
       />
-
       <Button
         variant="contained"
         color="primary"
@@ -110,59 +97,99 @@ export default function WeeklyReport() {
       </Button>
 
       {report && report.entries.length > 0 && (
-      <Paper id="billPreview" sx={{ p: 3, mb: 3, overflowX: "auto" }}>
-  <Typography variant="h6" gutterBottom>
-    User: {report.userName} | Week: {new Date(selectedSunday).toLocaleDateString("en-GB")} (Mon-Sat)
-  </Typography>
-
-  <table style={{
-      width: "100%",
-      borderCollapse: "collapse",
-      textAlign: "center",
-      marginTop: "10px"
-  }}>
-    <thead>
-      <tr style={{ backgroundColor: "#f0f0f0" }}>
-        <th style={{ border: "1px solid #ccc", padding: "8px" }}>Date</th>
-        <th style={{ border: "1px solid #ccc", padding: "8px" }}>Sqft</th>
-        <th style={{ border: "1px solid #ccc", padding: "8px" }}>From</th>
-        <th style={{ border: "1px solid #ccc", padding: "8px" }}>Total</th>
-        <th style={{ border: "1px solid #ccc", padding: "8px" }}>Paid</th>
-        <th style={{ border: "1px solid #ccc", padding: "8px" }}>Remaining</th>
-      </tr>
-    </thead>
-    <tbody>
-      {report.entries.map((e, i) => (
-        <tr key={i} style={{ borderBottom: "1px solid #eee" }}>
-          <td style={{ border: "1px solid #ccc", padding: "8px" }}>{new Date(e.date).toLocaleDateString("en-GB")}</td>
-          <td style={{ border: "1px solid #ccc", padding: "8px" }}>{e.sqft || 0}</td>
-          <td style={{ border: "1px solid #ccc", padding: "8px" }}>{e.from || "-"}</td>
-          <td style={{ border: "1px solid #ccc", padding: "8px" }}>{e.total || 0}</td>
-          <td style={{ border: "1px solid #ccc", padding: "8px" }}>{e.paidAmount || 0}</td>
-          <td style={{ border: "1px solid #ccc", padding: "8px" }}>{e.remainingAmount || 0}</td>
-        </tr>
-      ))}
-    </tbody>
-    <tfoot>
-      <tr style={{ backgroundColor: "#f9f9f9" }}>
-        <td colSpan={3} style={{ border: "1px solid #ccc", padding: "8px" }}><b>Total</b></td>
-        <td style={{ border: "1px solid #ccc", padding: "8px" }}><b>{report.totalAmount}</b></td>
-        <td style={{ border: "1px solid #ccc", padding: "8px" }}><b>{report.totalPaid}</b></td>
-        <td style={{ border: "1px solid #ccc", padding: "8px" }}><b>{report.totalRemaining}</b></td>
-      </tr>
-    </tfoot>
-  </table>
-
-  <Button
-    variant="contained"
-    color="secondary"
-    sx={{ mt: 2 }}
-    onClick={handlePrint}
-  >
-    Print Report
-  </Button>
-</Paper>
-
+        <Paper id="billPreview" sx={{ p: 3, mb: 3, overflowX: "auto" }}>
+          <Typography variant="h6" gutterBottom>
+            User: {report.userName} | Week: {new Date(selectedSunday).toLocaleDateString("en-GB")} (Mon-Sat)
+          </Typography>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              textAlign: "center",
+              tableLayout: "fixed", 
+              marginTop: "15px",
+              fontSize: "14px",
+            }}
+          >
+            <thead>
+              <tr style={{ backgroundColor: "#1976d2", color: "white" }}>
+                <th style={{ padding: "10px", width: "12%" }}>Date</th>
+                <th style={{ padding: "10px", width: "10%" }}>Sqft</th>
+                <th style={{ padding: "10px", width: "12%" }}>Item</th>
+                <th style={{ padding: "10px", width: "12%" }}>From</th>
+                <th style={{ padding: "10px", width: "12%" }}>Party To</th>
+                <th style={{ padding: "10px", width: "10%" }}>Total</th>
+                <th style={{ padding: "10px", width: "10%" }}>Paid</th>
+                <th style={{ padding: "10px", width: "12%" }}>Remaining</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.entries.map((e, i) => (
+                <tr
+                  key={i}
+                  style={{
+                    borderBottom: "1px solid #ddd",
+                    backgroundColor: i % 2 === 0 ? "#fafafa" : "white", // ✅ zebra effect
+                  }}
+                >
+                  <td style={{ padding: "8px" }}>
+                    {new Date(e.date).toLocaleDateString("en-GB")}
+                  </td>
+                  <td style={{ padding: "8px" }}>{e.sqft || 0}</td>
+                  <td style={{ padding: "8px" }}>{e.item || "-"}</td>
+                  <td style={{ padding: "8px" }}>{e.from || "-"}</td>
+                  <td style={{ padding: "8px" }}>{e.partyTo || "-"}</td>
+                  <td style={{ padding: "8px", fontWeight: "bold" }}>{e.total || 0}</td>
+                  <td
+                    style={{
+                      padding: "8px",
+                      fontWeight: "bold",
+                      color: "#2e7d32", // dark green
+                    }}
+                  >
+                    {e.paidAmount || 0}
+                  </td>
+                  <td
+                    style={{
+                      padding: "8px",
+                      fontWeight: "bold",
+                      color: (e.remainingAmount || 0) > 0 ? "#d32f2f" : "#2e7d32",
+                    }}
+                  >
+                    {e.remainingAmount || 0}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ backgroundColor: "#f4f6f8", fontWeight: "bold" }}>
+                <td colSpan={5} style={{ padding: "10px", textAlign: "right" }}>
+                  Total:
+                </td>
+                <td style={{ padding: "10px" }}>{report.totalAmount}</td>
+                <td style={{ padding: "10px", color: "#2e7d32" }}>
+                  {report.totalPaid}
+                </td>
+                <td
+                  style={{
+                    padding: "10px",
+                    color: report.totalRemaining > 0 ? "#d32f2f" : "#2e7d32",
+                  }}
+                >
+                  {report.totalRemaining}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+          <Button
+            variant="contained"
+            color="secondary"
+            sx={{ mt: 2 }}
+            onClick={handlePrint}
+          >
+            Print Report
+          </Button>
+        </Paper>
       )}
     </Box>
   );
