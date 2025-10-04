@@ -22,6 +22,8 @@ export default function Layout({ children }) {
     { text: "Add User Work", path: "/user_work" },
     { text: "User Wise Find Reports", path: "/reports" },
     { text: "Days Wise Find Reports", path: "/days_data" },
+    { text: "Jama Kharch", path: "/pending_payment" },
+    {text: "Sunday Report", path: "/sunday_report"},
   ];
 
   return (
