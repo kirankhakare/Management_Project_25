@@ -6,9 +6,9 @@ export default function Header() {
     <Box
       sx={{
         width: "100%",
-        backgroundColor: "#0D47A1", // Dark Blue for contrast
-        color: "#FFD700", // Gold text for effective visibility
-        height: 80, // Increased header height
+        backgroundColor: "#0D47A1", 
+        color: "#FFD700",
+        height: 80, 
         overflow: "hidden",
         position: "relative",
         display: "flex",
@@ -31,8 +31,7 @@ export default function Header() {
           Welcome to Construction Site...
         </Typography>
       </Box>
-
-      {/* CSS animation */}
+      
       <style>
         {`
           @keyframes marquee {

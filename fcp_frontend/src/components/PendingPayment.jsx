@@ -1,89 +1,69 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Box, Typography, TextField, Button, Paper, Autocomplete } from "@mui/material";
 import axios from "axios";
+import AllPendingPayments from "../components/AllPendingPayments";
 
-export default function PendingPayments() {
-  const [userOptions, setUserOptions] = useState([]);
-  const [partyOptions, setPartyOptions] = useState([]);
+export default function PendingPaymentsTotal() {
   const [selectedUser, setSelectedUser] = useState("");
-  const [selectedParty, setSelectedParty] = useState("");
+  const [userOptions, setUserOptions] = useState([]); 
   const [pendingEntries, setPendingEntries] = useState([]);
-  const [filteredEntries, setFilteredEntries] = useState([]);
-  const [payAmounts, setPayAmounts] = useState({});
-  const [paymentDates, setPaymentDates] = useState({});
-
-  // Fetch user suggestions
-  const fetchUserSuggestions = async (name) => {
-    if (!name) return setUserOptions([]);
-    try {
-      const res = await axios.get("http://localhost:5000/api/userWork/search", { params: { name } });
-      setUserOptions(res.data);
-    } catch (err) {
-      console.error(err);
+  const [totalPay, setTotalPay] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [showBox, setShowBox] = useState(false);
+  const handleUserSearch = async (event, newValue) => {
+    setSelectedUser(newValue);
+    if (newValue && newValue.length >= 1) {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/userWork/search?name=${newValue}`);
+        setUserOptions(res.data); // res.data should be an array of names
+      } catch (err) {
+        console.error(err);
+        setUserOptions([]);
+      }
+    } else {
+      setUserOptions([]);
     }
   };
 
-  // Fetch pending entries
   const fetchPending = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser) return alert("Enter party name");
     try {
       const res = await axios.get("http://localhost:5000/api/userWork/pending", {
-        params: { name: selectedUser, start: "2000-01-01", end: "2100-01-01" },
+        params: { name: selectedUser },
       });
-
-      // Only pending entries (remainingAmount > 0)
-      const pending = res.data.filter(e => e.remainingAmount > 0);
-
-      setPendingEntries(pending);
-
-      // Extract unique party names
-      const parties = [...new Set(pending.map(e => e.partyTo || ""))];
-      setPartyOptions(parties);
-
-      // Reset payAmounts and paymentDates
-      const amounts = {};
-      const dates = {};
-      pending.forEach(e => {
-        amounts[e.id] = e.remainingAmount; // default pay full remaining
-        dates[e.id] = new Date().toISOString().split("T")[0]; // default today
-      });
-      setPayAmounts(amounts);
-      setPaymentDates(dates);
-
-      // Apply party filter
-      if (selectedParty) {
-        setFilteredEntries(pending.filter(e => e.partyTo === selectedParty));
-      } else {
-        setFilteredEntries(pending);
-      }
-
+      setPendingEntries(res.data);
     } catch (err) {
       console.error(err);
+      alert("Failed to fetch pending entries");
     }
   };
 
-  useEffect(() => {
-    fetchPending();
-  }, [selectedUser]);
+  const totalRemaining = pendingEntries.reduce((sum, e) => sum + e.remainingAmount, 0);
 
-  // Filter entries by Party To
-  useEffect(() => {
-    if (!selectedParty) setFilteredEntries(pendingEntries);
-    else setFilteredEntries(pendingEntries.filter(e => e.partyTo === selectedParty));
-  }, [selectedParty, pendingEntries]);
+  const handleTotalPay = async () => {
+    let payAmount = parseFloat(totalPay);
+    if (!payAmount || payAmount <= 0) return alert("Enter valid payment amount");
+    if (payAmount > totalRemaining) return alert("Payment exceeds total remaining");
 
-  const handlePay = async (entryId) => {
-    const amount = parseFloat(payAmounts[entryId]);
-    if (!amount || amount <= 0) return alert("Enter valid amount");
-
+    const updatedEntries = [...pendingEntries];
     try {
-      await axios.post("http://localhost:5000/api/userWork/pay", {
-        entryId,
-        amount,
-        date: paymentDates[entryId], // optional if you want to save payment date
-      });
-      alert("Payment successful!");
-      fetchPending(); // refresh table
+      for (let entry of updatedEntries) {
+        if (payAmount <= 0) break;
+        const payForEntry = Math.min(payAmount, entry.remainingAmount);
+
+        await axios.post("http://localhost:5000/api/userWork/pay", {
+          entryId: entry.id,
+          amount: payForEntry,
+          date: paymentDate,
+        });
+
+        entry.remainingAmount -= payForEntry;
+        payAmount -= payForEntry;
+      }
+
+      alert("Payment applied successfully!");
+      setTotalPay("");
+      fetchPending();
     } catch (err) {
       console.error(err);
       alert("Payment failed");
@@ -91,92 +71,102 @@ export default function PendingPayments() {
   };
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", mt: 5, p: 3 }}>
-      <Typography variant="h4" gutterBottom align="center">
-        Pending Payments
-      </Typography>
+    <Box sx={{ maxWidth: "100%", mx: "auto", mt: 5, px: 2 }}>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 3 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => setShowBox(!showBox)}
+        >
+          {showBox ? "Close Pending Payments" : "Open Pending Payments"}
+        </Button>
+      </Box>
 
-      {/* User Autocomplete */}
-      <Autocomplete
-        freeSolo
-        options={userOptions}
-        value={selectedUser}
-        onInputChange={(e, val) => {
-          setSelectedUser(val);
-          fetchUserSuggestions(val);
-        }}
-        renderInput={(params) => <TextField {...params} label="User Name" fullWidth sx={{ mb: 2 }} />}
-      />
-
-      {/* Party Autocomplete */}
-      <Autocomplete
-        freeSolo
-        options={partyOptions}
-        value={selectedParty}
-        onChange={(e, val) => setSelectedParty(val)}
-        renderInput={(params) => <TextField {...params} label="Party To" fullWidth sx={{ mb: 2 }} />}
-      />
-
-      <Button variant="contained" color="primary" fullWidth sx={{ mb: 3 }} onClick={fetchPending}>
-        Show Pending
-      </Button>
-
-      {filteredEntries.length > 0 && (
-        <Paper sx={{ p: 3, overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: "14px" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#1976d2", color: "white" }}>
-                <th>User Name</th>
-                <th>Party To</th>
-                <th>Date</th>
-                <th>Remaining Amount</th>
-                <th>Pay Amount</th>
-                <th>Payment Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEntries.map((e) => (
-                <tr key={e.id}>
-                  <td>{e.name}</td>
-                  <td>{e.partyTo || "-"}</td>
-                  <td>{new Date(e.date).toLocaleDateString("en-GB")}</td>
-                  <td style={{ color: e.remainingAmount > 0 ? "#d32f2f" : "#2e7d32" }}>{e.remainingAmount}</td>
-
-                  {/* Pay Amount Input */}
-                  <td>
-                    <TextField
-                      type="number"
-                      value={payAmounts[e.id]}
-                      onChange={(ev) => setPayAmounts({ ...payAmounts, [e.id]: ev.target.value })}
-                      size="small"
-                      inputProps={{ min: 0, max: e.remainingAmount }}
-                    />
-                  </td>
-
-                  {/* Payment Date Input */}
-                  <td>
-                    <TextField
-                      type="date"
-                      value={paymentDates[e.id]}
-                      onChange={(ev) => setPaymentDates({ ...paymentDates, [e.id]: ev.target.value })}
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </td>
-
-                  {/* Pay Button */}
-                  <td>
-                    <Button variant="contained" color="secondary" onClick={() => handlePay(e.id)}>
-                      Pay
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {showBox && (
+        <Paper sx={{ p: 3, mb: 3, overflowX: "auto" }}>
+          <Autocomplete
+            freeSolo
+            options={userOptions}
+            value={selectedUser}
+            onInputChange={handleUserSearch}
+            renderInput={(params) => <TextField {...params} label="Party Name" fullWidth sx={{ mb: 2 }} />}
+          />
+          <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            sx={{ mb: 3 }}
+            onClick={fetchPending}
+          >
+            Show Pending
+          </Button>
+          {pendingEntries.length > 0 && (
+            <>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  textAlign: "center",
+                  minWidth: 400,
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: "#1976d2", color: "white" }}>
+                    <th style={{ padding: "12px 8px", border: "1px solid #1976d2" }}>Party Name</th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #1976d2" }}>Address</th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #1976d2" }}>Date</th>
+                    <th style={{ padding: "12px 8px", border: "1px solid #1976d2" }}>Remaining Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingEntries.map((e, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid #ddd" }}>
+                      <td style={{ padding: "10px 8px", border: "1px solid #ddd" }}>{e.name}</td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #ddd" }}>{e.partyTo}</td>
+                      <td style={{ padding: "10px 8px", border: "1px solid #ddd" }}>
+                        {new Date(e.date).toLocaleDateString("en-GB")}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 8px",
+                          border: "1px solid #ddd",
+                          color: e.remainingAmount > 0 ? "#d32f2f" : "#2e7d32",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {e.remainingAmount}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Box sx={{ display: "flex", alignItems: "center", mt: 2, gap: 2, flexWrap: "wrap" }}>
+                <Typography variant="subtitle1">Total Remaining: {totalRemaining}</Typography>
+                <TextField
+                  label="Pay Amount"
+                  type="number"
+                  value={totalPay}
+                  onChange={(e) => setTotalPay(e.target.value)}
+                  size="small"
+                />
+                <TextField
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                />
+                <Button variant="contained" color="secondary" onClick={handleTotalPay}>
+                  Pay
+                </Button>
+              </Box>
+            </>
+          )}
         </Paper>
       )}
+      <Box sx={{ mt: 4 }}>
+        <AllPendingPayments />
+      </Box>
     </Box>
   );
 }

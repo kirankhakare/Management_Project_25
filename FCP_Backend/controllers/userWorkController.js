@@ -1,32 +1,59 @@
 const UserWork = require("../models/UserWork");
+const allowedItems = ["Reti", "1/4", "Crush", "Malma", "Gitti"];
+const allowedPaymentModes = ["Cash", "Online"];
+const allowedPaymentStatus = ["Paid", "Unpaid"];
+const allowedVehicleNos = ["K101", "K102"];
 
 exports.createWork = async (req, res) => {
   try {
-    const { name, sqft, item, from, partyTo, malPlus, kating, date, paymentStatus, paidAmount, addUser, paymentMode } = req.body;
+    let { name, sqft, item, from, partyTo, malPlus, kating, date, paymentStatus, paidAmount, addUser, paymentMode, vehicleNo } = req.body;
 
     if (!name) return res.status(400).json({ message: "User name is required" });
 
+    // Check if user exists
     const existingUser = await UserWork.findOne({ name });
-
     if (!existingUser && !addUser) {
       return res.status(200).json({ isNewUser: true, message: "User does not exist" });
     }
 
+    // Normalize item
+    const normalizedItem = allowedItems.find(i => i.toLowerCase() === (item || "").toLowerCase());
+    if (!normalizedItem) {
+      return res.status(400).json({ message: `${item || "undefined"} is not a valid item` });
+    }
+
+    // Normalize paymentStatus
+    paymentStatus = allowedPaymentStatus.includes(paymentStatus) ? paymentStatus : "Unpaid";
+
+    // Normalize paymentMode (only if Paid)
+    if (paymentStatus === "Paid") {
+      paymentMode = allowedPaymentModes.includes(paymentMode) ? paymentMode : "Cash";
+      paidAmount = parseFloat(paidAmount) || 0;
+    } else {
+      paymentMode = undefined;
+      paidAmount = 0;
+    }
+
+    // Normalize vehicleNo
+    vehicleNo = allowedVehicleNos.includes(vehicleNo) ? vehicleNo : allowedVehicleNos[0];
+
+    // Calculate total
     const totalAmount = (parseFloat(malPlus) || 0) + (parseFloat(kating) || 0);
 
     const newWork = new UserWork({
       name,
       sqft,
-      item,
+      item: normalizedItem,
       from,
       partyTo,
-      malPlus,
-      kating,
+      malPlus: parseFloat(malPlus) || 0,
+      kating: parseFloat(kating) || 0,
       total: totalAmount,
       date: date || new Date(),
       paymentStatus,
-      paidAmount: paymentStatus === "Paid" ? (parseFloat(paidAmount) || 0) : 0,
-      paymentMode: paymentMode || "Cash", // new field
+      paidAmount,
+      paymentMode,
+      vehicleNo,
     });
 
     await newWork.save();
@@ -95,7 +122,7 @@ exports.getWeeklyReportByName = async (req, res) => {
         remainingAmount,
         item: e.item || "-",
         partyTo: e.partyTo || "-",
-        paymentMode: e.paymentMode || "Cash",
+        paymentMode: e.paymentMode,
       };
     });
 
@@ -137,7 +164,7 @@ exports.getWeeklyReportAllUsers = async (req, res) => {
       return {
         ...obj,
         unpaidAmount: (obj.total || 0) - (obj.paidAmount || 0),
-        paymentMode: obj.paymentMode || "Cash",
+        paymentMode: obj.paymentMode,
       };
     });
 
@@ -198,8 +225,15 @@ exports.payRemainingAmount = async (req, res) => {
       return res.status(400).json({ message: "Amount exceeds remaining balance" });
     }
 
+    // Normalize item to match schema enum
+    const allowedItems = ["Reti", "1/4", "Crush", "Malma", "Gitti"];
+    if (entry.item) {
+      const normalizedItem = allowedItems.find(i => i.toLowerCase() === entry.item.toLowerCase());
+      if (normalizedItem) entry.item = normalizedItem;
+      else entry.item = allowedItems[0]; // fallback to first enum value
+    }
+
     entry.paidAmount = currentPaid + amount;
-    // Optional: update paymentStatus if fully paid
     if (entry.paidAmount >= entry.total) entry.paymentStatus = "Paid";
 
     await entry.save();
@@ -228,24 +262,22 @@ exports.getWeeklySundayReport = async (req, res) => {
     // Fetch all entries in that week
     const entries = await UserWork.find({
       date: { $gte: mondayDate, $lte: sundayDate },
-    });
+    }).sort({ date: 1 });
 
     if (!entries.length) return res.json([]);
 
-    // Aggregate remaining amounts by user
-    const reportMap = {};
-    entries.forEach(e => {
-      const remaining = (e.total || 0) - (e.paidAmount || 0);
-      if (remaining > 0) {
-        if (reportMap[e.name]) reportMap[e.name] += remaining;
-        else reportMap[e.name] = remaining;
-      }
+    // Prepare report per entry
+    const report = entries.map(e => {
+      const remainingAmount = (e.total || 0) - (e.paidAmount || 0);
+      return {
+        id: e._id,
+        name: e.name,
+        partyTo: e.partyTo || "-",
+        date: e.date,
+        total: e.total || 0,
+        remainingAmount: remainingAmount,
+      };
     });
-
-    const report = Object.keys(reportMap).map(name => ({
-      name,
-      remainingAmount: reportMap[name],
-    }));
 
     res.json(report);
 
@@ -254,4 +286,168 @@ exports.getWeeklySundayReport = async (req, res) => {
     res.status(500).json({ message: "Error fetching weekly Sunday report", error: err.message });
   }
 };
+
+exports.getWeeklyEntriesDayWise = async (req, res) => {
+  try {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 - Sunday, 1 - Monday ...
+
+    // Current week Monday
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    monday.setHours(0, 0, 0, 0);
+
+    // Current week Sunday
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    // Fetch all entries in the week
+    const entries = await UserWork.find({
+      date: { $gte: monday, $lte: sunday },
+    }).sort({ date: 1 });
+
+    // Group by date
+    const dayWiseMap = {};
+    entries.forEach((e) => {
+      const dateKey = e.date.toISOString().split("T")[0]; // YYYY-MM-DD
+      if (!dayWiseMap[dateKey]) dayWiseMap[dateKey] = [];
+      dayWiseMap[dateKey].push({
+        name: e.name,
+        item: e.item || "-",
+        from:e.from || "KGN",
+        partyTo: e.partyTo || "-",
+        sqft: e.sqft,
+        malPlus: e.malPlus,
+        kating: e.kating,
+        total: e.total,
+        paidAmount: e.paidAmount,
+        remainingAmount: (e.total || 0) - (e.paidAmount || 0),
+        paymentStatus: e.paymentStatus,
+        paymentMode: e.paymentMode || "-",
+        vehicleNo: e.vehicleNo || "-", // ← Add vehicleNo here
+      });
+    });
+
+    // Prepare final list Monday → Sunday
+    const result = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + i);
+      const key = day.toISOString().split("T")[0];
+
+      result.push({
+        date: key,
+        entries: dayWiseMap[key] || [], // empty array if no entry
+      });
+    }
+
+    res.json(result);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching day-wise weekly entries", error: err.message });
+  }
+};
+
+// weeklyPendingReport endpoint
+exports.getWeeklyPendingReport = async (req, res) => {
+  try {
+    const entries = await UserWork.find().sort({ date: 1 });
+
+    // Group by user
+    const usersMap = {};
+    entries.forEach(e => {
+      const remaining = (e.total || 0) - (e.paidAmount || 0);
+      if (!usersMap[e.name]) usersMap[e.name] = [];
+      usersMap[e.name].push({
+        date: e.date,
+        partyTo: e.partyTo || "-",
+        total: e.total || 0,
+        remainingAmount: remaining,
+      });
+    });
+
+    const result = Object.keys(usersMap).map(name => ({
+      name,
+      entries: usersMap[name],
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch weekly pending report" });
+  }
+};
+
+// Get all entries filtered by Gadi No
+exports.getAllByGadiNo = async (req, res) => {
+  try {
+    const { vehicleNo } = req.query;
+
+    const query = {};
+    if (vehicleNo && vehicleNo !== "All") {
+      query.vehicleNo = vehicleNo;
+    }
+
+    const entries = await UserWork.find(query).sort({ date: -1 });
+
+    const result = entries.map((e) => ({
+      name: e.name,
+      from: e.from || "-",
+      partyTo: e.partyTo || "-",
+      vehicleNo: e.vehicleNo || "-",
+      date: e.date,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch entries", error: err.message });
+  }
+};
+
+exports.getKGNReport = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query; // Match frontend params
+
+    if (!fromDate || !toDate) {
+      return res.status(400).json({ message: "From and To dates are required" });
+    }
+    const from = new Date(fromDate);
+    from.setHours(0, 0, 0, 0);
+
+    const to = new Date(toDate);
+    to.setHours(23, 59, 59, 999);
+
+    const entries = await UserWork.find({
+      from: "KGN",
+      date: { $gte: from, $lte: to },
+    }).sort({ date: -1 });
+
+    if (!entries.length) {
+      return res.json([]);
+    }
+    const report = entries.map((e, index) => ({
+      srNo: index + 1,
+      from: e.from || "-",
+      sqft: e.sqft || 0,
+      total: e.total || 0,
+      date: e.date,
+    }));
+
+    res.json(report);
+  } catch (err) {
+    console.error("Error in getKGNReport:", err);
+    res.status(500).json({ message: "Error fetching KGN report", error: err.message });
+  }
+};
+
+
+
+
+
+
+
+
 
